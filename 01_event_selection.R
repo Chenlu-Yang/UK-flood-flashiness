@@ -102,10 +102,6 @@ STUDY_END   <- as.POSIXct("2021-12-31 23:59:59", tz = "UTC")
 # Define the peak threshold quantile
 q <- 0.99
 
-# Assign an ID number to the method.
-# This is retained only for consistency with the original workflow.
-method <- 7
-
 # Set TRUE only if diagnostic event plots are required.
 SAVE_EVENT_PLOTS <- FALSE
 
@@ -114,11 +110,7 @@ SAVE_EVENT_PLOTS <- FALSE
 
 # Read catchment information.
 # The catchments used in the study were pre-screened for data completeness.
-catchment_info <- read.csv(
-  file = CATCHMENT_FILE,
-  header = TRUE,
-  stringsAsFactors = FALSE
-)
+catchment_info <- read.csv(file = CATCHMENT_FILE, header = TRUE,stringsAsFactors = FALSE)
 
 # Retrieve the station IDs
 catchment_id <- catchment_info$id
@@ -137,11 +129,7 @@ full_time <- data.frame(
 for (h in seq_along(q)) {
   
   # Create separate folders to store results for different threshold settings.
-  folder_path <- file.path(
-    OUTPUT_ROOT,
-    paste0("Method_", method),
-    paste0("Event_selection_", q[h])
-  )
+  folder_path <- file.path(OUTPUT_ROOT,paste0("Event_selection_", q[h]))
   
   if (!dir.exists(folder_path)) {
     dir.create(folder_path, recursive = TRUE)
@@ -286,12 +274,7 @@ for (h in seq_along(q)) {
     
     
     # Simulate / estimate baseflow.
-    BF <- baseflowB(
-      data_site$value,
-      alpha = 0.995,
-      passes = 3,
-      r = 30
-    )
+    BF <- baseflowB(data_site$value,alpha = 0.995, passes = 3, r = 30)
     
     # Store the estimated baseflow in the dataset.
     data_site$BF <- BF$bf
@@ -309,7 +292,6 @@ for (h in seq_along(q)) {
     # Indices of local maxima in the raw series.
     lmax_val <- which(data_site$ext_value == "Max")
     
-    
     # ----- For smoothed data -----
     
     # Indices of local minima in the smoothed series.
@@ -317,7 +299,6 @@ for (h in seq_along(q)) {
     
     # Indices of local maxima in the smoothed series.
     lmax_ma <- which(data_site$ext_ma == "Max")
-    
     
     # Use the threshold to select candidate peaks in the raw series.
     threshold_quantile <- q[h]
@@ -336,24 +317,16 @@ for (h in seq_along(q)) {
     # If no eligible candidate peaks are present, save an empty output and move
     # to the next catchment.
     if (length(Pot_index) == 0 || length(lmax_ma) == 0) {
-      warning(
-        "No eligible peak candidates for catchment ",
-        catchment_id[j]
-      )
+      warning("No eligible peak candidates for catchment ", catchment_id[j])
       next
     }
     
     # Exclude partial events outside the main analysis range.
     Pot_index <- Pot_index[Pot_index >= lmax_ma[1]]
-    Pot_index <- Pot_index[
-      Pot_index <= lmax_ma[length(lmax_ma)]
-    ]
+    Pot_index <- Pot_index[Pot_index <= lmax_ma[length(lmax_ma)]]
     
     if (length(Pot_index) == 0) {
-      warning(
-        "No peak candidates remained after edge filtering for catchment ",
-        catchment_id[j]
-      )
+      warning("No peak candidates remained after edge filtering for catchment ",catchment_id[j])
       next
     }
     
@@ -361,12 +334,7 @@ for (h in seq_along(q)) {
     data_site$filter_1 <- 0
     
     # Mark points above the threshold as threshold exceedances.
-    data_site$filter_1 <- ifelse(
-      data_site$value > threshold,
-      1,
-      0
-    )
-    
+    data_site$filter_1 <- ifelse(data_site$value > threshold,1,0)
     
     # --------Separation Based on Temporal Distance------------
     
@@ -382,25 +350,17 @@ for (h in seq_along(q)) {
     lag_index <- which(lag > min_diff)
     
     # Event end points: peaks followed by a gap > 12 h.
-    end_index <- c(
-      Pot_index[lag_index],
-      Pot_index[length(Pot_index)]
-    )
+    end_index <- c(Pot_index[lag_index],Pot_index[length(Pot_index)])
     
     # Event start points: first peak, and peaks following a gap > 12 h.
-    start_index <- c(
-      Pot_index[1],
-      Pot_index[lag_index + 1]
-    )
+    start_index <- c(Pot_index[1],Pot_index[lag_index + 1])
     
     # Filter 2: assign unique event IDs to each preliminary event segment.
     data_site$filter_2 <- 0
     event_rank <- seq_along(end_index)
     
     for (i in seq_along(end_index)) {
-      data_site$filter_2[
-        start_index[i]:end_index[i]
-      ] <- event_rank[i]
+      data_site$filter_2[start_index[i]:end_index[i]] <- event_rank[i]
     }
     
     
@@ -408,10 +368,7 @@ for (h in seq_along(q)) {
     
     # delta_y is set to 4 × IQR of the flow values.
     # IQR = Q3 - Q1 (75th percentile - 25th percentile).
-    delta_y <- 4 * (
-      quantile(data_site$value, 0.75, na.rm = TRUE) -
-        quantile(data_site$value, 0.25, na.rm = TRUE)
-    )
+    delta_y <- 4 * (quantile(data_site$value, 0.75, na.rm = TRUE) - quantile(data_site$value, 0.25, na.rm = TRUE))
     
     # Create a new column to store results after applying the start/end criteria.
     data_site$filter_3 <- 0
@@ -436,18 +393,13 @@ for (h in seq_along(q)) {
     for (i in seq_along(event_rank)) {
       
       # Current event subset as defined by filter_2.
-      sub_data <- subset(
-        data_site,
-        data_site$filter_2 == event_rank[i]
-      )
+      sub_data <- subset(data_site,data_site$filter_2 == event_rank[i])
       
       # Find the highest flow within the current preliminary event.
       max_val <- max(sub_data$value)
       
       # Index of the event peak; take the first if there are ties.
-      sub_max_idx <- sub_data$index[
-        sub_data$value == max_val
-      ]
+      sub_max_idx <- sub_data$index[sub_data$value == max_val]
       sub_max_idx <- sub_max_idx[1]
       
       
@@ -455,33 +407,22 @@ for (h in seq_along(q)) {
       
       # Candidate start points before the peak based on minima in the smoothed
       # series within the preliminary event segment.
-      sub_dat_min_back <- subset(
-        sub_data,
-        ext_ma == "Min" &
-          index < sub_max_idx
-      )
+      sub_dat_min_back <- subset(sub_data,ext_ma == "Min" & index < sub_max_idx)
       
       # Index of the first candidate peak in the current preliminary event.
       p_str_idx <- min(sub_data$index)
       
       # Include smoothed minima occurring before that first candidate peak.
-      p_str_idx <- lmin_ma[
-        lmin_ma < p_str_idx
-      ]
+      p_str_idx <- lmin_ma[lmin_ma < p_str_idx]
       
       # Append smoothed minima found within the event segment before the main peak.
-      p_str_idx <- c(
-        p_str_idx,
-        sub_dat_min_back$index
-      )
+      p_str_idx <- c(p_str_idx,sub_dat_min_back$index)
       
       # Remove duplicates.
       p_str_idx <- unique(p_str_idx)
       
       # Ensure candidate starts are below the event peak value.
-      p_str_idx <- p_str_idx[
-        data_site$value[p_str_idx] < max_val
-      ]
+      p_str_idx <- p_str_idx[data_site$value[p_str_idx] < max_val]
       
       # If no candidate start points are found, record NA for this event and
       # continue to the next event.
@@ -505,9 +446,7 @@ for (h in seq_along(q)) {
         
         pre_peak <- events_data$max_index[i - 1]
         
-        p_str_idx <- p_str_idx[
-          p_str_idx > pre_peak
-        ]
+        p_str_idx <- p_str_idx[p_str_idx > pre_peak]
         
         # If no candidate start points remain, record NA and continue.
         if (length(p_str_idx) == 0) {
@@ -533,9 +472,7 @@ for (h in seq_along(q)) {
       diff_bf <- data_site$R[p_str_idx]
       
       # Candidates whose amplitude exceeds delta_y.
-      vally_index <- which(
-        diff_back > delta_y
-      )
+      vally_index <- which(diff_back > delta_y)
       
       # If no candidate meets the delta_y criterion, take the candidate with the
       # largest amplitude drop.
@@ -553,48 +490,25 @@ for (h in seq_along(q)) {
         candidate_diff_bf <- diff_bf[vally_index]
         
         # Pick the last among ties for stability.
-        best_bf_idx <- tail(
-          which(
-            candidate_diff_bf ==
-              min(candidate_diff_bf)
-          ),
-          1
-        )
+        best_bf_idx <- tail(which(candidate_diff_bf == min(candidate_diff_bf)),1)
         
-        str_index_ma <- candidate_idx[
-          best_bf_idx
-        ]
+        str_index_ma <- candidate_idx[best_bf_idx]
         
         
         # Refine start point on the raw series near the moving-average start
         # candidate (±5 samples).
         l_b <- str_index_ma - 5
         
-        u_b <- ifelse(
-          str_index_ma + 5 < sub_max_idx,
-          str_index_ma + 5,
-          sub_max_idx - 1
-        )
+        u_b <- ifelse(str_index_ma + 5 < sub_max_idx,str_index_ma + 5,sub_max_idx - 1)
         
         # Protect the lower bound at the start of the record.
         l_b <- max(1, l_b)
         
-        raw_sub_data <- data_site[
-          l_b:u_b,
-        ]
+        raw_sub_data <- data_site[l_b:u_b,]
         
         # Prefer raw local minima if present; otherwise retain the whole window.
-        if (
-          nrow(
-            subset(
-              raw_sub_data,
-              raw_sub_data$ext_value == "Min"
-            )
-          ) == 0
-        ) {
-          
+        if (nrow(subset(raw_sub_data,raw_sub_data$ext_value == "Min")) == 0) {
           raw_sub_data <- raw_sub_data
-          
         } else {
           
           raw_sub_data <- subset(
@@ -604,41 +518,24 @@ for (h in seq_along(q)) {
         }
         
         # Choose the point closest to baseflow within the raw-data window.
-        raw_sub_idx <- which.min(
-          raw_sub_data$R
-        )[1]
-        
-        str_index <- raw_sub_data$index[
-          raw_sub_idx
-        ]
+        raw_sub_idx <- which.min(raw_sub_data$R)[1]
+        str_index <- raw_sub_data$index[raw_sub_idx]
       }
       
       
       # --------End-point selection--------
       
       # Smoothed minima after the event peak.
-      min_after_peak <- lmin_ma[
-        lmin_ma > sub_max_idx
-      ]
+      min_after_peak <- lmin_ma[lmin_ma > sub_max_idx]
       
       if (length(min_after_peak) != 0) {
         
         # Define the search window from the current peak to the next event's
         # peak, or to the end of the series for the final event.
         if (i <= length(event_rank) - 1) {
-          
-          next_data <- subset(
-            data_site,
-            data_site$filter_2 == event_rank[i + 1]
-          )
-          
-          max_val_next <- max(
-            next_data$value
-          )
-          
-          next_max_idx <- next_data$index[
-            next_data$value == max_val_next
-          ][1]
+          next_data <- subset(data_site, data_site$filter_2 == event_rank[i + 1])
+          max_val_next <- max(next_data$value)
+          next_max_idx <- next_data$index[next_data$value == max_val_next][1]
           
         } else {
           
@@ -646,27 +543,16 @@ for (h in seq_along(q)) {
         }
         
         
-        potential_end_data <- data_site[
-          sub_max_idx:next_max_idx,
-        ]
+        potential_end_data <- data_site[sub_max_idx:next_max_idx,]
         
         # Select the point closest to baseflow within this window.
-        potential_end_idx <- which.min(
-          potential_end_data$R
-        )
-        
-        end_index_ma <- potential_end_data$index[
-          potential_end_idx
-        ]
+        potential_end_idx <- which.min(potential_end_data$R)
+        end_index_ma <- potential_end_data$index[potential_end_idx]
         
         
         # Refine end point on the raw series near the selected end point (±5
         # samples).
-        l_b <- ifelse(
-          end_index_ma - 5 > sub_max_idx,
-          end_index_ma - 5,
-          sub_max_idx + 1
-        )
+        l_b <- ifelse(end_index_ma - 5 > sub_max_idx, end_index_ma - 5, sub_max_idx + 1)
         
         if (
           end_index_ma <= nrow(data_site) - 5
@@ -680,52 +566,28 @@ for (h in seq_along(q)) {
         }
         
         
-        raw_sub_data <- data_site[
-          l_b:u_b,
-        ]
+        raw_sub_data <- data_site[l_b:u_b,]
         
         # Prefer raw local minima if present; otherwise retain the whole window.
-        if (
-          nrow(
-            subset(
-              raw_sub_data,
-              raw_sub_data$ext_value == "Min"
-            )
-          ) == 0
-        ) {
-          
+        if (nrow(subset(raw_sub_data, raw_sub_data$ext_value == "Min")) == 0) {
           raw_sub_data <- raw_sub_data
-          
         } else {
           
-          raw_sub_data <- subset(
-            raw_sub_data,
-            raw_sub_data$ext_value == "Min"
-          )
+          raw_sub_data <- subset(raw_sub_data, raw_sub_data$ext_value == "Min")
         }
         
         # Choose the point closest to baseflow as the event end.
-        raw_sub_idx <- which.min(
-          raw_sub_data$R
-        )[1]
+        raw_sub_idx <- which.min(raw_sub_data$R)[1]
         
-        end_index <- raw_sub_data$index[
-          raw_sub_idx
-        ]
+        end_index <- raw_sub_data$index[raw_sub_idx]
         
         
         # Capture dates for diagnostics / QA.
-        str_date <- data_site$date[
-          str_index
-        ]
+        str_date <- data_site$date[str_index]
         
-        max_date <- data_site$date[
-          sub_max_idx
-        ]
+        max_date <- data_site$date[sub_max_idx]
         
-        end_date <- data_site$date[
-          end_index
-        ]
+        end_date <- data_site$date[end_index]
         
         
         # Persist event boundaries.
@@ -737,9 +599,7 @@ for (h in seq_along(q)) {
         )
         
         # Stamp the final event segment into filter_3.
-        data_site$filter_3[
-          str_index:end_index
-        ] <- event_rank[i]
+        data_site$filter_3[str_index:end_index] <- event_rank[i]
         
       } else {
         
@@ -760,9 +620,7 @@ for (h in seq_along(q)) {
     events_data <- na.omit(events_data)
     
     # Reassign event IDs sequentially after cleaning.
-    events_data$event <- seq_len(
-      nrow(events_data)
-    )
+    events_data$event <- seq_len(nrow(events_data))
     
     
     # --------Calculate FI------------
@@ -782,10 +640,7 @@ for (h in seq_along(q)) {
       # A small constant is added to Q_i to avoid division by zero.
       Q_i <- data_site$value[t_i] + 0.00001
       
-      events_data$FI[i] <- (
-        ((Q_P - Q_i) / Q_i) /
-          ((t_P - t_i) / delta_t)
-      )
+      events_data$FI[i] <- (((Q_P - Q_i) / Q_i) /((t_P - t_i) / delta_t))
     }
     
     
@@ -804,10 +659,7 @@ for (h in seq_along(q)) {
       # This preserves the calculation used in the original analysis.
       # The denominator is the number of 15-minute time steps between event
       # start and peak.
-      events_data$RoC[i] <- (
-        (Q_P - Q_i) /
-          (t_P - t_i)
-      )
+      events_data$RoC[i] <- ((Q_P - Q_i) /(t_P - t_i))
     }
     
     
@@ -818,35 +670,21 @@ for (h in seq_along(q)) {
     # Extract the timestamp of the event peak from the main dataset.
     max_time <- events_data$max_index
     
-    events_data$time <- data_site$date[
-      max_time
-    ]
+    events_data$time <- data_site$date[max_time]
     
     # Extract peak month as a numeric value (1–12).
-    events_data$month <- as.numeric(
-      substr(
-        events_data$time,
-        6,
-        7
-      )
-    )
+    events_data$month <- as.numeric(substr(events_data$time,6,7))
     
     # Extract start, end, and peak dates for each event.
     str_time <- events_data$str_index
     end_time <- events_data$end_index
     peak_time <- events_data$max_index
     
-    events_data$str_date <- data_site$date[
-      str_time
-    ]
+    events_data$str_date <- data_site$date[str_time]
     
-    events_data$end_date <- data_site$date[
-      end_time
-    ]
+    events_data$end_date <- data_site$date[end_time]
     
-    events_data$peak_date <- data_site$date[
-      peak_time
-    ]
+    events_data$peak_date <- data_site$date[peak_time]
     
     
     # Assign meteorological seasons based on the peak month.
@@ -878,24 +716,14 @@ for (h in seq_along(q)) {
     
     
     # Display a frequency table of events by season.
-    print(
-      table(events_data$season)
-    )
+    print(table(events_data$season))
     
-    events_data$time <- format(
-      as.POSIXct(events_data$time),
-      "%Y-%m-%d %H:%M:%S",
-      tz = "UTC"
-    )
+    events_data$time <- format(as.POSIXct(events_data$time),"%Y-%m-%d %H:%M:%S", tz = "UTC")
     
     
     # --------Save event table------------
     
-    write.csv(
-      events_data,
-      file = output_file,
-      row.names = FALSE
-    )
+    write.csv(events_data,file = output_file,row.names = FALSE)
     
     
     # --------Optional event plots------------
@@ -903,96 +731,46 @@ for (h in seq_along(q)) {
     if (SAVE_EVENT_PLOTS) {
       
       # Create output directory for plots.
-      save_dir <- file.path(
-        PLOT_ROOT,
-        paste0("Method_", method),
-        as.character(catchment_id[j])
-      )
+      save_dir <- file.path(PLOT_ROOT,as.character(catchment_id[j]))
       
-      if (!dir.exists(save_dir)) {
-        dir.create(
-          save_dir,
-          recursive = TRUE
-        )
-      }
-      
-      
+      if (!dir.exists(save_dir)) {dir.create(save_dir,recursive = TRUE)}
+
       # Loop over all detected events.
-      for (events in seq_len(
-        nrow(events_data)
-      )) {
+      for (events in seq_len(nrow(events_data))) {
         
         # Event metadata.
         event_num <- events
         
-        str_date <- as.POSIXct(
-          events_data$str_date[event_num],
-          tz = "UTC"
-        )
+        str_date <- as.POSIXct(events_data$str_date[event_num],tz = "UTC")
         
-        end_date <- as.POSIXct(
-          events_data$end_date[event_num],
-          tz = "UTC"
-        )
+        end_date <- as.POSIXct(events_data$end_date[event_num],tz = "UTC")
         
-        event_idx <- events_data$str_index[event_num]:
-          events_data$end_index[event_num]
+        event_idx <- events_data$str_index[event_num]:events_data$end_index[event_num]
         
         
         # Ensure UTC timezone.
-        str_date <- lubridate::with_tz(
-          str_date,
-          tzone = "UTC"
-        )
+        str_date <- lubridate::with_tz(str_date,tzone = "UTC")
         
-        end_date <- lubridate::with_tz(
-          end_date,
-          tzone = "UTC"
-        )
+        end_date <- lubridate::with_tz(end_date,tzone = "UTC")
         
         
         # Subset data for ±1 day around the event period.
-        data_p <- data_site[
-          data_site$date >= str_date - days(1) &
-            data_site$date <= end_date + days(1),
-        ]
+        data_p <- data_site[data_site$date >= str_date - days(1) & data_site$date <= end_date + days(1),]
         
-        data_p$date <- as.POSIXct(
-          data_p$date,
-          format = "%Y-%m-%d %H:%M:%S",
-          tz = "UTC"
-        )
+        data_p$date <- as.POSIXct(data_p$date, format = "%Y-%m-%d %H:%M:%S",tz = "UTC")
         
         
         # Highlight event points in red; all others in black.
-        data_p$color <- ifelse(
-          data_p$index %in% event_idx,
-          "red",
-          "black"
-        )
+        data_p$color <- ifelse(data_p$index %in% event_idx,"red", "black")
         
         
-        p <- ggplot(
-          data_p,
-          aes(
-            x = date,
-            y = value
-          )
-        ) +
+        p <- ggplot(data_p, aes( x = date, y = value)) +
           
           # 10-point moving-average series.
-          geom_line(
-            aes(y = ma),
-            color = "blue",
-            linewidth = 1
-          ) +
+          geom_line(aes(y = ma), color = "blue", linewidth = 1) +
           
           # Local minima in the smoothed series.
-          geom_point(
-            data = subset(
-              data_p,
-              ext_ma == "Min"
-            ),
+          geom_point(data = subset(data_p, ext_ma == "Min"),
             aes(y = ma),
             color = "purple",
             shape = 17,
@@ -1000,74 +778,31 @@ for (h in seq_along(q)) {
           ) +
           
           # Raw flow series; event interval is highlighted.
-          geom_line(
-            aes(
-              group = 1,
-              color = color
-            ),
-            linewidth = 1
-          ) +
+          geom_line(aes(group = 1,color = color), linewidth = 1) +
           
-          geom_point(
-            aes(color = color),
-            size = 1
-          ) +
+          geom_point(aes(color = color),size = 1) +
           
           # Estimated baseflow.
-          geom_line(
-            aes(y = BF),
-            color = "#00BFFF",
-            linewidth = 1
-          ) +
+          geom_line(aes(y = BF),color = "#00BFFF",linewidth = 1) +
           
           scale_color_identity() +
           
-          scale_x_datetime(
-            date_labels = "%b %d %H:%M"
-          ) +
+          scale_x_datetime(date_labels = "%b %d %H:%M") +
           
-          labs(
-            title = paste0(
-              "Event ",
-              event_num
-            ),
-            x = "Date",
-            y = "Flow"
-          ) +
+          labs(title = paste0("Event ", event_num),x = "Date", y = "Flow") +
           
           theme_minimal() +
           
           theme(
-            plot.title = element_text(
-              size = 20,
-              hjust = 0.5
-            ),
-            axis.title = element_text(
-              size = 14
-            ),
-            axis.text = element_text(
-              size = 12
-            )
+            plot.title = element_text(size = 20,hjust = 0.5),
+            axis.title = element_text(size = 14),
+            axis.text = element_text(size = 12)
           )
         
         
         # Save plot to file.
-        file_name <- file.path(
-          save_dir,
-          paste0(
-            "Event_",
-            event_num,
-            ".png"
-          )
-        )
-        
-        ggsave(
-          filename = file_name,
-          plot = p,
-          width = 10,
-          height = 6,
-          dpi = 300
-        )
+        file_name <- file.path(save_dir,paste0("Event_",event_num,".png"))
+        ggsave(filename = file_name, plot = p, width = 10,height = 6,dpi = 300)
       }
     }
   }
